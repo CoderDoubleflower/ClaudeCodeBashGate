@@ -94,6 +94,33 @@ fn dynamic_expansion_error(kind: &str) -> TooComplex {
     )
 }
 
+fn trailing_fd_candidate(
+    body: Node<'_>,
+    source: &str,
+) -> Result<Option<(u32, String, usize)>, TooComplex> {
+    if body.kind() != "command" || body.named_child_count() < 2 {
+        return Ok(None);
+    }
+
+    let Some(last_child) = body.named_child(body.named_child_count() - 1) else {
+        return Ok(None);
+    };
+    if !matches!(last_child.kind(), "word" | "number") {
+        return Ok(None);
+    }
+
+    let raw = source_slice(source, last_child.start_byte(), last_child.end_byte())?;
+    if raw.is_empty() || !raw.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Ok(None);
+    }
+
+    Ok(Some((
+        parse_numeric_fd(raw)?,
+        raw.to_owned(),
+        last_child.end_byte(),
+    )))
+}
+
 struct Walker<'a> {
     source: &'a str,
     limits: ParseLimits,
@@ -160,6 +187,7 @@ impl Walker<'_> {
             ));
         }
 
+        let mut split_fd = trailing_fd_candidate(body, self.source)?;
         let range = self.walk_node(body)?;
         if range.is_empty() {
             return Err(TooComplex::invalid_structure(
@@ -178,7 +206,23 @@ impl Walker<'_> {
 
         let command = &mut self.commands[last_index];
         let mut new_end = command.span.end_byte;
-        for (redirect, span) in parsed_redirects {
+        for (mut redirect, span) in parsed_redirects {
+            if redirect.fd.is_none()
+                && split_fd
+                    .as_ref()
+                    .is_some_and(|(_, _, end_byte)| *end_byte == span.start_byte)
+            {
+                let (fd, raw, _) = split_fd.take().ok_or_else(|| {
+                    TooComplex::invalid_structure("split redirect fd candidate disappeared")
+                })?;
+                if command.argv.last().map(String::as_str) != Some(raw.as_str()) {
+                    return Err(TooComplex::invalid_structure(
+                        "split redirect fd does not match the trailing parsed argument",
+                    ));
+                }
+                command.argv.pop();
+                redirect.fd = Some(fd);
+            }
             new_end = new_end.max(span.end_byte);
             command.redirects.push(redirect);
         }
