@@ -10,11 +10,11 @@ pub(crate) fn node_span(node: Node<'_>) -> Span {
     }
 }
 
-pub(crate) fn source_slice<'a>(
-    source: &'a str,
+pub(crate) fn source_slice(
+    source: &str,
     start_byte: usize,
     end_byte: usize,
-) -> Result<&'a str, TooComplex> {
+) -> Result<&str, TooComplex> {
     source.get(start_byte..end_byte).ok_or_else(|| {
         TooComplex::invalid_structure(format!(
             "tree-sitter span {start_byte}..{end_byte} is not a UTF-8 boundary"

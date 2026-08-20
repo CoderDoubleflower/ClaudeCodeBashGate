@@ -75,10 +75,25 @@ fn extracts_file_redirects() {
     for (source, expected) in cases {
         let program = parsed(source);
         assert_eq!(program.commands.len(), 1, "source: {source}");
-        assert_eq!(program.commands[0].redirects, [expected], "source: {source}");
+        assert_eq!(
+            program.commands[0].redirects,
+            [expected],
+            "source: {source}"
+        );
         assert_eq!(program.commands[0].text, source);
         assert_eq!(program.commands[0].span.end_byte, source.len());
     }
+}
+
+#[test]
+fn duplicate_input_fd_requires_unquoted_byte_adjacency() {
+    let adjacent = parsed("cat 0<&3");
+    assert_eq!(adjacent.commands[0].argv, ["cat"]);
+    assert_eq!(adjacent.commands[0].redirects[0].fd, Some(0));
+
+    let spaced = parsed("cat 0 <&3");
+    assert_eq!(spaced.commands[0].argv, ["cat", "0"]);
+    assert_eq!(spaced.commands[0].redirects[0].fd, None);
 }
 
 #[test]
