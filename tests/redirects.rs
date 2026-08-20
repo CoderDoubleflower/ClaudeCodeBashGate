@@ -86,6 +86,17 @@ fn extracts_file_redirects() {
 }
 
 #[test]
+fn duplicate_input_fd_requires_unquoted_byte_adjacency() {
+    let adjacent = parsed("cat 0<&3");
+    assert_eq!(adjacent.commands[0].argv, ["cat"]);
+    assert_eq!(adjacent.commands[0].redirects[0].fd, Some(0));
+
+    let spaced = parsed("cat 0 <&3");
+    assert_eq!(spaced.commands[0].argv, ["cat", "0"]);
+    assert_eq!(spaced.commands[0].redirects[0].fd, None);
+}
+
+#[test]
 fn resolves_quoted_redirect_target_without_splitting() {
     let program = parsed(r#"cat input > "result file.txt""#);
     assert_eq!(program.commands[0].redirects[0].target, "result file.txt");
