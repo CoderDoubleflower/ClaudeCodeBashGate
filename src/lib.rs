@@ -11,8 +11,8 @@ pub mod model;
 
 pub use limits::ParseLimits;
 pub use model::{
-    EnvAssignment, GateResult, OperatorOccurrence, ParseError, ParsedProgram, Redirect,
-    RedirectOp, ShellOperator, SimpleCommand, Span, TooComplex, TooComplexReason,
+    EnvAssignment, GateResult, OperatorOccurrence, ParseError, ParsedProgram, Redirect, RedirectOp,
+    ShellOperator, SimpleCommand, Span, TooComplex, TooComplexReason,
 };
 pub use parser::BashGate;
 
