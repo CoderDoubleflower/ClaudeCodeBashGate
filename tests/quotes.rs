@@ -46,7 +46,10 @@ fn rejects_runtime_expansion_in_or_outside_quotes() {
 #[test]
 fn rejects_unquoted_shell_expansions() {
     for source in ["echo *.txt", "echo file?.txt", "echo {a,b}", "echo ~/src"] {
-        assert_eq!(too_complex(source).reason, TooComplexReason::DynamicExpansion);
+        assert_eq!(
+            too_complex(source).reason,
+            TooComplexReason::DynamicExpansion
+        );
     }
 }
 
