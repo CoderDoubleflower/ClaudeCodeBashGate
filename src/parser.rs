@@ -170,9 +170,7 @@ fn differential_precheck(source: &str) -> Option<TooComplex> {
                 ));
             }
             b'\n' => {
-                return Some(TooComplex::suspicious(
-                    "contains backslash-newline joining",
-                ));
+                return Some(TooComplex::suspicious("contains backslash-newline joining"));
             }
             _ => {}
         }
@@ -184,14 +182,13 @@ fn differential_precheck(source: &str) -> Option<TooComplex> {
 fn is_suspicious_unicode_whitespace(character: char) -> bool {
     matches!(
         character,
-        '\u{00A0}'
-            | '\u{1680}'
-            | '\u{2000}'..='\u{200B}'
-            | '\u{2028}'
-            | '\u{2029}'
-            | '\u{202F}'
-            | '\u{205F}'
-            | '\u{3000}'
-            | '\u{FEFF}'
+        '\u{00A0}' | '\u{1680}' | '\u{2000}'
+            ..='\u{200B}'
+                | '\u{2028}'
+                | '\u{2029}'
+                | '\u{202F}'
+                | '\u{205F}'
+                | '\u{3000}'
+                | '\u{FEFF}'
     )
 }
