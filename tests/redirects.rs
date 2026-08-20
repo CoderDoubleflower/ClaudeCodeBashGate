@@ -1,7 +1,10 @@
 mod common;
 
+use std::fmt::Write as _;
+
 use bashgate::{Redirect, RedirectOp, TooComplexReason};
 use common::{parsed, too_complex};
+use tree_sitter::{Language, Node, Parser};
 
 #[test]
 fn extracts_file_redirects() {
@@ -73,6 +76,9 @@ fn extracts_file_redirects() {
     ];
 
     for (source, expected) in cases {
+        if source == "cat 0<&3" {
+            eprintln!("AST for {source:?}:\n{}", dump_ast(source));
+        }
         let program = parsed(source);
         assert_eq!(program.commands.len(), 1, "source: {source}");
         assert_eq!(
@@ -82,6 +88,39 @@ fn extracts_file_redirects() {
         );
         assert_eq!(program.commands[0].text, source);
         assert_eq!(program.commands[0].span.end_byte, source.len());
+    }
+}
+
+fn dump_ast(source: &str) -> String {
+    let mut parser = Parser::new();
+    let language: Language = tree_sitter_bash::LANGUAGE.into();
+    parser
+        .set_language(&language)
+        .expect("load tree-sitter-bash grammar");
+    let tree = parser.parse(source, None).expect("parse debug command");
+    let mut output = String::new();
+    dump_node(tree.root_node(), source, 0, &mut output);
+    output
+}
+
+fn dump_node(node: Node<'_>, source: &str, depth: usize, output: &mut String) {
+    let text = source
+        .get(node.start_byte()..node.end_byte())
+        .unwrap_or("<invalid UTF-8 span>");
+    writeln!(
+        output,
+        "{}{} named={} {}..{} {text:?}",
+        "  ".repeat(depth),
+        node.kind(),
+        node.is_named(),
+        node.start_byte(),
+        node.end_byte()
+    )
+    .expect("write AST dump");
+
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        dump_node(child, source, depth + 1, output);
     }
 }
 
