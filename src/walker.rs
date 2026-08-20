@@ -4,9 +4,7 @@ use tree_sitter::Node;
 
 use crate::argument::{parse_argument, parse_env_assignment};
 use crate::limits::ParseLimits;
-use crate::model::{
-    ParsedProgram, Redirect, SimpleCommand, Span, TooComplex,
-};
+use crate::model::{ParsedProgram, Redirect, SimpleCommand, Span, TooComplex};
 use crate::redirect::parse_redirect;
 use crate::structure::{node_span, operator_occurrence, source_slice};
 
@@ -157,9 +155,7 @@ impl Walker<'_> {
                 "file_redirect" | "heredoc_redirect" | "herestring_redirect" => {
                     redirects.push(parse_redirect(child, self.source)?);
                 }
-                "word" | "string" | "raw_string" | "number" | "concatenation"
-                    if seen_name =>
-                {
+                "word" | "string" | "raw_string" | "number" | "concatenation" if seen_name => {
                     argv.push(parse_argument(child, self.source)?);
                 }
                 "comment" => {}
@@ -192,9 +188,7 @@ impl Walker<'_> {
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
             match child.kind() {
-                "declare" | "typeset" | "export" | "readonly" | "local"
-                    if argv.is_empty() =>
-                {
+                "declare" | "typeset" | "export" | "readonly" | "local" if argv.is_empty() => {
                     argv.push(child.kind().to_owned());
                 }
                 "variable_assignment" => {
