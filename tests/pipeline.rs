@@ -8,11 +8,7 @@ fn parses_multi_stage_pipeline() {
 
     assert_eq!(
         argv(&program),
-        vec![
-            vec!["cat", "a"],
-            vec!["grep", "foo"],
-            vec!["head", "-10"],
-        ]
+        vec![vec!["cat", "a"], vec!["grep", "foo"], vec!["head", "-10"],]
     );
     assert_eq!(operators(&program), ["|", "|"]);
     assert_eq!(program.commands[0].text, "cat a");

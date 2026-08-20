@@ -5,7 +5,7 @@ use tree_sitter::Node;
 use crate::argument::{parse_argument, parse_env_assignment};
 use crate::limits::ParseLimits;
 use crate::model::{
-    ParsedProgram, Redirect, SimpleCommand, Span, TooComplex,
+    OperatorOccurrence, ParsedProgram, Redirect, ShellOperator, SimpleCommand, Span, TooComplex,
 };
 use crate::redirect::parse_redirect;
 use crate::structure::{node_span, operator_occurrence, source_slice};
@@ -25,6 +25,7 @@ pub(crate) fn walk_program(
     walker
         .commands
         .sort_by_key(|command| (command.span.start_byte, command.span.end_byte));
+    recover_newline_operators(source, &walker.commands, &mut walker.operators)?;
     walker
         .operators
         .sort_by_key(|operator| (operator.span.start_byte, operator.span.end_byte));
@@ -36,11 +37,52 @@ pub(crate) fn walk_program(
     })
 }
 
+fn recover_newline_operators(
+    source: &str,
+    commands: &[SimpleCommand],
+    operators: &mut Vec<OperatorOccurrence>,
+) -> Result<(), TooComplex> {
+    for adjacent in commands.windows(2) {
+        let left = &adjacent[0];
+        let right = &adjacent[1];
+        if left.span.end_byte > right.span.start_byte {
+            return Err(TooComplex::invalid_structure(
+                "simple command spans overlap after source-order sorting",
+            ));
+        }
+
+        let between_start = left.span.end_byte;
+        let between_end = right.span.start_byte;
+        let has_explicit_operator = operators.iter().any(|operator| {
+            operator.span.start_byte >= between_start && operator.span.end_byte <= between_end
+        });
+        if has_explicit_operator {
+            continue;
+        }
+
+        let gap = source_slice(source, between_start, between_end)?;
+        let Some(relative_newline) = gap.find('\n') else {
+            return Err(TooComplex::invalid_structure(
+                "adjacent commands have no recognized shell separator",
+            ));
+        };
+        let start_byte = between_start + relative_newline;
+        operators.push(OperatorOccurrence {
+            op: ShellOperator::Newline,
+            span: Span {
+                start_byte,
+                end_byte: start_byte + 1,
+            },
+        });
+    }
+    Ok(())
+}
+
 struct Walker<'a> {
     source: &'a str,
     limits: ParseLimits,
     commands: Vec<SimpleCommand>,
-    operators: Vec<crate::model::OperatorOccurrence>,
+    operators: Vec<OperatorOccurrence>,
 }
 
 impl Walker<'_> {
@@ -157,7 +199,16 @@ impl Walker<'_> {
                 "file_redirect" | "heredoc_redirect" | "herestring_redirect" => {
                     redirects.push(parse_redirect(child, self.source)?);
                 }
-                "word" | "string" | "raw_string" | "number" | "concatenation"
+                "word" | "string" | "raw_string" | "number" | "concatenation" if seen_name => {
+                    argv.push(parse_argument(child, self.source)?);
+                }
+                "command_substitution"
+                | "process_substitution"
+                | "simple_expansion"
+                | "expansion"
+                | "arithmetic_expansion"
+                | "brace_expression"
+                | "extglob_pattern"
                     if seen_name =>
                 {
                     argv.push(parse_argument(child, self.source)?);
@@ -192,9 +243,7 @@ impl Walker<'_> {
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
             match child.kind() {
-                "declare" | "typeset" | "export" | "readonly" | "local"
-                    if argv.is_empty() =>
-                {
+                "declare" | "typeset" | "export" | "readonly" | "local" if argv.is_empty() => {
                     argv.push(child.kind().to_owned());
                 }
                 "variable_assignment" => {

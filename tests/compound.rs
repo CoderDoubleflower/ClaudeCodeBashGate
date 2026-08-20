@@ -1,6 +1,6 @@
 mod common;
 
-use bashgate::TooComplexReason;
+use bashgate::{Span, TooComplexReason};
 use common::{argv, operators, parsed, too_complex};
 
 #[test]
@@ -49,9 +49,35 @@ fn mixed_structures_are_sorted_by_source_position() {
 
 #[test]
 fn comments_do_not_become_commands() {
-    let program = parsed("a # note\nb");
+    let source = "a # note\nb";
+    let program = parsed(source);
     assert_eq!(argv(&program), vec![vec!["a"], vec!["b"]]);
     assert_eq!(operators(&program), ["\n"]);
+    assert_eq!(
+        program.operators[0].span,
+        Span {
+            start_byte: 8,
+            end_byte: 9,
+        }
+    );
+}
+
+#[test]
+fn newline_after_an_explicit_operator_is_not_a_second_boundary() {
+    let cases = [
+        ("a &&\nb", vec!["&&"]),
+        ("a ||\nb", vec!["||"]),
+        ("a |\nb", vec!["|"]),
+        ("a |&\nb", vec!["|&"]),
+        ("a ;\nb", vec![";"]),
+        ("a &\nb", vec!["&"]),
+    ];
+
+    for (source, expected_operators) in cases {
+        let program = parsed(source);
+        assert_eq!(argv(&program), vec![vec!["a"], vec!["b"]]);
+        assert_eq!(operators(&program), expected_operators, "source: {source}");
+    }
 }
 
 #[test]

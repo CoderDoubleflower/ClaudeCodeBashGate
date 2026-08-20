@@ -7,17 +7,9 @@ use crate::limits::ParseLimits;
 use crate::model::{GateResult, ParseError, ParsedProgram, TooComplex};
 use crate::walker::walk_program;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct BashGate {
     limits: ParseLimits,
-}
-
-impl Default for BashGate {
-    fn default() -> Self {
-        Self {
-            limits: ParseLimits::default(),
-        }
-    }
 }
 
 impl BashGate {
@@ -159,24 +151,18 @@ fn differential_precheck(source: &str) -> Option<TooComplex> {
         ));
     }
 
-    let bytes = source.as_bytes();
-    for index in 0..bytes.len().saturating_sub(1) {
-        if bytes[index] != b'\\' {
+    for pair in source.as_bytes().windows(2) {
+        if pair[0] != b'\\' {
             continue;
         }
-        match bytes[index + 1] {
+        match pair[1] {
             b' ' | b'\t' => {
                 return Some(TooComplex::suspicious(
                     "contains backslash-escaped horizontal whitespace",
                 ));
             }
-            b'\n'
-                if index > 0
-                    && !matches!(bytes[index - 1], b' ' | b'\t' | b'\n' | b'\\') =>
-            {
-                return Some(TooComplex::suspicious(
-                    "contains backslash-newline word joining",
-                ));
+            b'\n' => {
+                return Some(TooComplex::suspicious("contains backslash-newline joining"));
             }
             _ => {}
         }
@@ -188,14 +174,13 @@ fn differential_precheck(source: &str) -> Option<TooComplex> {
 fn is_suspicious_unicode_whitespace(character: char) -> bool {
     matches!(
         character,
-        '\u{00A0}'
-            | '\u{1680}'
-            | '\u{2000}'..='\u{200B}'
-            | '\u{2028}'
-            | '\u{2029}'
-            | '\u{202F}'
-            | '\u{205F}'
-            | '\u{3000}'
-            | '\u{FEFF}'
+        '\u{00A0}' | '\u{1680}' | '\u{2000}'
+            ..='\u{200B}'
+                | '\u{2028}'
+                | '\u{2029}'
+                | '\u{202F}'
+                | '\u{205F}'
+                | '\u{3000}'
+                | '\u{FEFF}'
     )
 }
