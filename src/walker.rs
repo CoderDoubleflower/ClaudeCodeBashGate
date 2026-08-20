@@ -74,6 +74,26 @@ fn add_implicit_newline_operators(
     Ok(())
 }
 
+fn is_dynamic_expansion_node(kind: &str) -> bool {
+    matches!(
+        kind,
+        "command_substitution"
+            | "process_substitution"
+            | "simple_expansion"
+            | "expansion"
+            | "arithmetic_expansion"
+            | "brace_expression"
+            | "extglob_pattern"
+    )
+}
+
+fn dynamic_expansion_error(kind: &str) -> TooComplex {
+    TooComplex::dynamic(
+        kind,
+        "runtime expansion cannot be represented as a trustworthy static argv entry",
+    )
+}
+
 struct Walker<'a> {
     source: &'a str,
     limits: ParseLimits,
@@ -90,6 +110,9 @@ impl Walker<'_> {
             "command" => self.walk_command(node)?,
             "declaration_command" => self.walk_declaration_command(node)?,
             "comment" => {}
+            other if is_dynamic_expansion_node(other) => {
+                return Err(dynamic_expansion_error(other));
+            }
             other => return Err(TooComplex::unsupported(other)),
         }
         Ok(start..self.commands.len())
@@ -199,6 +222,9 @@ impl Walker<'_> {
                     argv.push(parse_argument(child, self.source)?);
                 }
                 "comment" => {}
+                other if is_dynamic_expansion_node(other) => {
+                    return Err(dynamic_expansion_error(other));
+                }
                 other => return Err(TooComplex::unsupported(other)),
             }
         }
@@ -244,6 +270,9 @@ impl Walker<'_> {
                     argv.push(parse_argument(child, self.source)?);
                 }
                 "comment" => {}
+                other if is_dynamic_expansion_node(other) => {
+                    return Err(dynamic_expansion_error(other));
+                }
                 other => return Err(TooComplex::unsupported(other)),
             }
         }
