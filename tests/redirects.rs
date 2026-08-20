@@ -75,7 +75,11 @@ fn extracts_file_redirects() {
     for (source, expected) in cases {
         let program = parsed(source);
         assert_eq!(program.commands.len(), 1, "source: {source}");
-        assert_eq!(program.commands[0].redirects, [expected], "source: {source}");
+        assert_eq!(
+            program.commands[0].redirects,
+            [expected],
+            "source: {source}"
+        );
         assert_eq!(program.commands[0].text, source);
         assert_eq!(program.commands[0].span.end_byte, source.len());
     }
