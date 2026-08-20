@@ -41,6 +41,8 @@ fn rejects_control_characters_and_parser_differentials() {
         "echo\rhidden",
         "echo foo\\ bar",
         "tr\\\naceroute",
+        "\\\necho ok",
+        "echo \\\nok",
     ] {
         assert_eq!(
             too_complex(source).reason,
