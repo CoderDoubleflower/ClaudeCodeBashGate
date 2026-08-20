@@ -233,8 +233,7 @@ impl Walker<'_> {
                 }
                 "word" | "string" | "raw_string" | "number" | "concatenation" if seen_name => {
                     argv.push(parse_argument(child, self.source)?);
-                    trailing_number_end =
-                        (child.kind() == "number").then_some(child.end_byte());
+                    trailing_number_end = (child.kind() == "number").then_some(child.end_byte());
                 }
                 "comment" => {
                     trailing_number_end = None;
