@@ -7,7 +7,7 @@ use crate::limits::ParseLimits;
 use crate::model::{
     OperatorOccurrence, ParsedProgram, Redirect, ShellOperator, SimpleCommand, Span, TooComplex,
 };
-use crate::redirect::parse_redirect;
+use crate::redirect::{parse_numeric_fd, parse_redirect};
 use crate::structure::{node_span, operator_occurrence, source_slice};
 
 pub(crate) fn walk_program(
@@ -194,12 +194,14 @@ impl Walker<'_> {
         let mut env = Vec::new();
         let mut redirects = Vec::new();
         let mut seen_name = false;
+        let mut trailing_number_end = None;
 
         let mut cursor = node.walk();
         for child in node.children(&mut cursor) {
             match child.kind() {
                 "variable_assignment" if !seen_name => {
                     env.push(parse_env_assignment(child, self.source)?);
+                    trailing_number_end = None;
                 }
                 "variable_assignment" => {
                     return Err(TooComplex::invalid_structure(
@@ -209,6 +211,7 @@ impl Walker<'_> {
                 "command_name" if !seen_name => {
                     argv.push(parse_argument(child, self.source)?);
                     seen_name = true;
+                    trailing_number_end = None;
                 }
                 "command_name" => {
                     return Err(TooComplex::invalid_structure(
@@ -216,12 +219,26 @@ impl Walker<'_> {
                     ));
                 }
                 "file_redirect" | "heredoc_redirect" | "herestring_redirect" => {
-                    redirects.push(parse_redirect(child, self.source)?);
+                    let mut redirect = parse_redirect(child, self.source)?;
+                    if redirect.fd.is_none() && trailing_number_end == Some(child.start_byte()) {
+                        let descriptor = argv.pop().ok_or_else(|| {
+                            TooComplex::invalid_structure(
+                                "adjacent redirect descriptor has no preceding argv entry",
+                            )
+                        })?;
+                        redirect.fd = Some(parse_numeric_fd(&descriptor)?);
+                    }
+                    trailing_number_end = None;
+                    redirects.push(redirect);
                 }
                 "word" | "string" | "raw_string" | "number" | "concatenation" if seen_name => {
                     argv.push(parse_argument(child, self.source)?);
+                    trailing_number_end =
+                        (child.kind() == "number").then_some(child.end_byte());
                 }
-                "comment" => {}
+                "comment" => {
+                    trailing_number_end = None;
+                }
                 other if is_dynamic_expansion_node(other) => {
                     return Err(dynamic_expansion_error(other));
                 }
