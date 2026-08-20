@@ -78,6 +78,63 @@ fn recover_newline_operators(
     Ok(())
 }
 
+fn recover_unscanned_file_descriptor(
+    source: &str,
+    body: Node<'_>,
+    command: &mut SimpleCommand,
+    redirects: &mut [(Redirect, Span)],
+) -> Result<(), TooComplex> {
+    let mut candidate_index = None;
+    for (index, (redirect, span)) in redirects.iter().enumerate() {
+        if redirect.fd.is_none() && span.start_byte == body.end_byte() {
+            if candidate_index.replace(index).is_some() {
+                return Err(TooComplex::invalid_structure(
+                    "multiple redirects are adjacent to an unscanned file descriptor",
+                ));
+            }
+        }
+    }
+
+    let Some(candidate_index) = candidate_index else {
+        return Ok(());
+    };
+    if command.span.end_byte != body.end_byte() {
+        return Ok(());
+    }
+
+    let redirect_start = redirects[candidate_index].1.start_byte;
+    let bytes = source.as_bytes();
+    let mut descriptor_start = redirect_start;
+    while descriptor_start > command.span.start_byte
+        && bytes[descriptor_start - 1].is_ascii_digit()
+    {
+        descriptor_start -= 1;
+    }
+    if descriptor_start == redirect_start {
+        return Ok(());
+    }
+
+    let descriptor_text = source_slice(source, descriptor_start, redirect_start)?;
+    if command.argv.last().map(String::as_str) != Some(descriptor_text) {
+        return Ok(());
+    }
+    if command.argv.len() == 1 {
+        return Err(TooComplex::invalid_structure(
+            "file descriptor recovery would leave no executable command",
+        ));
+    }
+
+    let fd = descriptor_text.parse::<u32>().map_err(|_| {
+        TooComplex::dynamic(
+            "file_descriptor",
+            "only numeric file descriptors representable as u32 are supported",
+        )
+    })?;
+    command.argv.pop();
+    redirects[candidate_index].0.fd = Some(fd);
+    Ok(())
+}
+
 struct Walker<'a> {
     source: &'a str,
     limits: ParseLimits,
@@ -158,6 +215,13 @@ impl Walker<'_> {
             })?;
 
         let command = &mut self.commands[last_index];
+        recover_unscanned_file_descriptor(
+            self.source,
+            body,
+            command,
+            &mut parsed_redirects,
+        )?;
+
         let mut new_end = command.span.end_byte;
         for (redirect, span) in parsed_redirects {
             new_end = new_end.max(span.end_byte);
