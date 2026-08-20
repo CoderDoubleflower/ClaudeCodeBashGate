@@ -4,7 +4,9 @@ use tree_sitter::Node;
 
 use crate::argument::{parse_argument, parse_env_assignment};
 use crate::limits::ParseLimits;
-use crate::model::{ParsedProgram, Redirect, SimpleCommand, Span, TooComplex};
+use crate::model::{
+    OperatorOccurrence, ParsedProgram, Redirect, ShellOperator, SimpleCommand, Span, TooComplex,
+};
 use crate::redirect::parse_redirect;
 use crate::structure::{node_span, operator_occurrence, source_slice};
 
@@ -23,6 +25,7 @@ pub(crate) fn walk_program(
     walker
         .commands
         .sort_by_key(|command| (command.span.start_byte, command.span.end_byte));
+    add_implicit_newline_operators(source, &walker.commands, &mut walker.operators)?;
     walker
         .operators
         .sort_by_key(|operator| (operator.span.start_byte, operator.span.end_byte));
@@ -34,11 +37,48 @@ pub(crate) fn walk_program(
     })
 }
 
+fn add_implicit_newline_operators(
+    source: &str,
+    commands: &[SimpleCommand],
+    operators: &mut Vec<OperatorOccurrence>,
+) -> Result<(), TooComplex> {
+    for pair in commands.windows(2) {
+        let previous = &pair[0];
+        let next = &pair[1];
+        let gap_start = previous.span.end_byte;
+        let gap_end = next.span.start_byte;
+
+        if gap_start > gap_end {
+            return Err(TooComplex::invalid_structure(format!(
+                "overlapping command spans: {gap_start} exceeds {gap_end}"
+            )));
+        }
+        if operators.iter().any(|operator| {
+            operator.span.start_byte >= gap_start && operator.span.end_byte <= gap_end
+        }) {
+            continue;
+        }
+
+        let gap = source_slice(source, gap_start, gap_end)?;
+        if let Some(relative_offset) = gap.as_bytes().iter().position(|byte| *byte == b'\n') {
+            let start_byte = gap_start + relative_offset;
+            operators.push(OperatorOccurrence {
+                op: ShellOperator::Newline,
+                span: Span {
+                    start_byte,
+                    end_byte: start_byte + 1,
+                },
+            });
+        }
+    }
+    Ok(())
+}
+
 struct Walker<'a> {
     source: &'a str,
     limits: ParseLimits,
     commands: Vec<SimpleCommand>,
-    operators: Vec<crate::model::OperatorOccurrence>,
+    operators: Vec<OperatorOccurrence>,
 }
 
 impl Walker<'_> {
