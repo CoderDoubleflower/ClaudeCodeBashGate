@@ -86,6 +86,26 @@ fn extracts_file_redirects() {
 }
 
 #[test]
+fn recovers_zero_prefixed_descriptors_without_polluting_argv() {
+    let input_duplication = parsed("cat 0<&3");
+    assert_eq!(input_duplication.commands[0].argv, ["cat"]);
+    assert_eq!(input_duplication.commands[0].redirects[0].fd, Some(0));
+
+    let leading_zero = parsed("cat 00>out");
+    assert_eq!(leading_zero.commands[0].argv, ["cat"]);
+    assert_eq!(leading_zero.commands[0].redirects[0].fd, Some(0));
+
+    let separated = parsed("cat 0 <&3");
+    assert_eq!(separated.commands[0].argv, ["cat", "0"]);
+    assert_eq!(separated.commands[0].redirects[0].fd, None);
+
+    assert_eq!(
+        too_complex("0<&3 cat").reason,
+        TooComplexReason::InvalidStructure
+    );
+}
+
+#[test]
 fn resolves_quoted_redirect_target_without_splitting() {
     let program = parsed(r#"cat input > "result file.txt""#);
     assert_eq!(program.commands[0].redirects[0].target, "result file.txt");
