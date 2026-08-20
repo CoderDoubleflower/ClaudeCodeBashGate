@@ -110,7 +110,7 @@ pub(crate) fn parse_redirect(node: Node<'_>, source: &str) -> Result<Redirect, T
     })
 }
 
-fn parse_numeric_fd(text: &str) -> Result<u32, TooComplex> {
+pub(crate) fn parse_numeric_fd(text: &str) -> Result<u32, TooComplex> {
     text.parse::<u32>().map_err(|_| {
         TooComplex::dynamic(
             "file_descriptor",
