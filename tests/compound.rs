@@ -53,7 +53,13 @@ fn comments_do_not_become_commands() {
     let program = parsed(source);
     assert_eq!(argv(&program), vec![vec!["a"], vec!["b"]]);
     assert_eq!(operators(&program), ["\n"]);
-    assert_eq!(program.operators[0].span, Span::new(8, 9));
+    assert_eq!(
+        program.operators[0].span,
+        Span {
+            start_byte: 8,
+            end_byte: 9,
+        }
+    );
 }
 
 #[test]
