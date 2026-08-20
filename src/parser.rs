@@ -7,17 +7,9 @@ use crate::limits::ParseLimits;
 use crate::model::{GateResult, ParseError, ParsedProgram, TooComplex};
 use crate::walker::walk_program;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct BashGate {
     limits: ParseLimits,
-}
-
-impl Default for BashGate {
-    fn default() -> Self {
-        Self {
-            limits: ParseLimits::default(),
-        }
-    }
 }
 
 impl BashGate {
