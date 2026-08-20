@@ -130,7 +130,10 @@ fn parse_unquoted_word(node: Node<'_>, source: &str) -> Result<String, TooComple
             "tilde expansion changes the runtime argv",
         ));
     }
-    if text.chars().any(|character| matches!(character, '*' | '?' | '[' | ']' | '{' | '}')) {
+    if text
+        .chars()
+        .any(|character| matches!(character, '*' | '?' | '[' | ']' | '{' | '}'))
+    {
         return Err(TooComplex::dynamic(
             "word",
             "glob or brace expansion may change the number or value of runtime arguments",
