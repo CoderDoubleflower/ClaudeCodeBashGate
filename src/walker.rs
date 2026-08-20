@@ -202,6 +202,17 @@ impl Walker<'_> {
                 "word" | "string" | "raw_string" | "number" | "concatenation" if seen_name => {
                     argv.push(parse_argument(child, self.source)?);
                 }
+                "command_substitution"
+                | "process_substitution"
+                | "simple_expansion"
+                | "expansion"
+                | "arithmetic_expansion"
+                | "brace_expression"
+                | "extglob_pattern"
+                    if seen_name =>
+                {
+                    argv.push(parse_argument(child, self.source)?);
+                }
                 "comment" => {}
                 other => return Err(TooComplex::unsupported(other)),
             }
