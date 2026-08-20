@@ -170,10 +170,7 @@ fn differential_precheck(source: &str) -> Option<TooComplex> {
                     "contains backslash-escaped horizontal whitespace",
                 ));
             }
-            b'\n'
-                if index > 0
-                    && !matches!(bytes[index - 1], b' ' | b'\t' | b'\n' | b'\\') =>
-            {
+            b'\n' if index > 0 && !matches!(bytes[index - 1], b' ' | b'\t' | b'\n' | b'\\') => {
                 return Some(TooComplex::suspicious(
                     "contains backslash-newline word joining",
                 ));
@@ -188,14 +185,13 @@ fn differential_precheck(source: &str) -> Option<TooComplex> {
 fn is_suspicious_unicode_whitespace(character: char) -> bool {
     matches!(
         character,
-        '\u{00A0}'
-            | '\u{1680}'
-            | '\u{2000}'..='\u{200B}'
-            | '\u{2028}'
-            | '\u{2029}'
-            | '\u{202F}'
-            | '\u{205F}'
-            | '\u{3000}'
-            | '\u{FEFF}'
+        '\u{00A0}' | '\u{1680}' | '\u{2000}'
+            ..='\u{200B}'
+                | '\u{2028}'
+                | '\u{2029}'
+                | '\u{202F}'
+                | '\u{205F}'
+                | '\u{3000}'
+                | '\u{FEFF}'
     )
 }
