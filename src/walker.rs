@@ -232,8 +232,12 @@ impl Walker<'_> {
                     redirects.push(redirect);
                 }
                 "word" | "string" | "raw_string" | "number" | "concatenation" if seen_name => {
+                    let raw = source_slice(self.source, child.start_byte(), child.end_byte())?;
+                    let is_unquoted_descriptor = matches!(child.kind(), "word" | "number")
+                        && !raw.is_empty()
+                        && raw.bytes().all(|byte| byte.is_ascii_digit());
                     argv.push(parse_argument(child, self.source)?);
-                    trailing_number_end = (child.kind() == "number").then_some(child.end_byte());
+                    trailing_number_end = is_unquoted_descriptor.then_some(child.end_byte());
                 }
                 "comment" => {
                     trailing_number_end = None;
